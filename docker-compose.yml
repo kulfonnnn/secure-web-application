@@ -1,0 +1,46 @@
+# okreslenie kontenerow
+services:
+
+# kontener - baza danych
+  db: 
+    image: postgres:17-alpine  #gotowy obraz postgreSQL
+    restart: unless-stopped # automatycznie uruchamia konener po awarii/restarcie dockera
+    environment: # zmienne srodowiskowe
+      POSTGRES_DB: ${POSTGRES_DB} # nazwa bazy
+      POSTGRES_USER: ${POSTGRES_USER} # uzytkownik bazy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # haslo uzytkownika
+    volumes: 
+      - postgres_data:/var/lib/postgresql/data # w tym katalogu trzymane dane
+#sprawdza, czy postgreSQL jest gotowy do przyjmowania polaczen
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+# kontener - aplikacja django
+  web:
+    build: . # uzywa dockerfile z biezacego katalogu
+    environment: 
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY} # tajny klucz Django
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True} # debugowanie on/off (domyslnie on)
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1} # dozwolone hosty:domyslne
+      #laczenie danych z bazy z apka
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_PORT: "5432"
+# adres_hosta:port_hosta:port_konenera
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on: # kolejnosc uruchamiania
+      db:
+        condition: service_healthy # czekanie, az baza danych bedzie dzialac
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  postgres_data:
