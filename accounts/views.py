@@ -15,7 +15,7 @@ def register_view(request):
         if form.is_valid():
             user = form.save()  # Creates user in database
             login(request, user)  # Automatic login after registration
-            messages.success(request, 'Account created successfully if e-mail ')
+            messages.success(request, 'Account created successfully.')
             return redirect('accounts:dashboard')
     else:
         form = RegisterForm()
