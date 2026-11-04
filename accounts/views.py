@@ -3,6 +3,7 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 from .forms import RegisterForm
 
 
@@ -41,6 +42,8 @@ def login_view(request):
 
 
 
+# Logout only via POST (GET logout could be triggered by any site)
+@require_POST
 def logout_view(request):
     logout(request)
     messages.info(request, "You're logged out")
