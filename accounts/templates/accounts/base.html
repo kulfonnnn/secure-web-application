@@ -13,6 +13,7 @@
             <a class="navbar-brand" href="{% url 'accounts:dashboard' %}">App</a>
             <div class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
+                    <a class="nav-link" href="{% url 'forum:forum_list' %}">Forum</a>
                     <span class="nav-link text-light">{{ user.username }}</span>
                     <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
                         {% csrf_token %}

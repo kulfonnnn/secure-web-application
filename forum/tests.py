@@ -80,3 +80,102 @@ class FormValidationTests(TestCase):
         form = PostForm(data={"content": "<p>Safe text here</p><script>alert(1)</script>"})
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data["content"], "<p>Safe text here</p>")
+
+
+class AccessTests(ForumTestCase):
+    def test_anonymous_redirected_to_login(self):
+        self.client.logout()
+        url = reverse("forum:forum_list")
+        response = self.client.get(url)
+        self.assertRedirects(response, f"{reverse('accounts:login')}?next={url}")
+
+
+class TopicViewTests(ForumTestCase):
+    def test_create_topic(self):
+        response = self.client.post(
+            reverse("forum:topic_create", args=[self.forum.pk]),
+            {"title": "My first topic", "content": VALID_CONTENT},
+        )
+        topic = Topic.objects.get(title="My first topic")
+        self.assertRedirects(response, reverse("forum:topic_detail", args=[topic.pk]))
+        self.assertEqual(topic.author, self.alice)
+        self.assertEqual(topic.posts.get().content, VALID_CONTENT)
+
+    def test_topic_list_shows_topic(self):
+        self.create_topic(title="Listed topic")
+        response = self.client.get(reverse("forum:topic_list", args=[self.forum.pk]))
+        self.assertContains(response, "Listed topic")
+
+    def test_topic_detail_shows_posts(self):
+        topic = self.create_topic()
+        response = self.client.get(reverse("forum:topic_detail", args=[topic.pk]))
+        self.assertContains(response, VALID_CONTENT)
+        self.assertContains(response, "alice")
+
+    def test_reply_to_topic(self):
+        topic = self.create_topic()
+        self.client.force_login(self.bob)
+        self.client.post(
+            reverse("forum:topic_detail", args=[topic.pk]), {"content": "Reply from Bob here."}
+        )
+        self.assertEqual(topic.posts.count(), 2)
+        self.assertEqual(topic.posts.last().author, self.bob)
+
+    def test_xss_not_rendered(self):
+        self.client.post(
+            reverse("forum:topic_create", args=[self.forum.pk]),
+            {"title": "XSS attempt", "content": "Hello there <script>alert(1)</script>"},
+        )
+        topic = Topic.objects.get(title="XSS attempt")
+        response = self.client.get(reverse("forum:topic_detail", args=[topic.pk]))
+        self.assertNotContains(response, "<script>alert(1)</script>")
+
+
+class PostOwnershipTests(ForumTestCase):
+    def setUp(self):
+        super().setUp()
+        self.topic = self.create_topic()
+        self.reply = Post.objects.create(
+            topic=self.topic, author=self.alice, content="Second post by Alice."
+        )
+
+    def test_author_can_edit(self):
+        response = self.client.post(
+            reverse("forum:post_edit", args=[self.reply.pk]), {"content": "Edited content here."}
+        )
+        self.assertRedirects(response, reverse("forum:topic_detail", args=[self.topic.pk]))
+        self.reply.refresh_from_db()
+        self.assertEqual(self.reply.content, "Edited content here.")
+        self.assertIsNotNone(self.reply.edited_at)
+
+    def test_other_user_cannot_edit(self):
+        self.client.force_login(self.bob)
+        response = self.client.post(
+            reverse("forum:post_edit", args=[self.reply.pk]), {"content": "Hacked by Bob!!!"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.reply.refresh_from_db()
+        self.assertEqual(self.reply.content, "Second post by Alice.")
+
+    def test_author_can_delete_reply(self):
+        self.client.post(reverse("forum:post_delete", args=[self.reply.pk]))
+        self.assertFalse(Post.objects.filter(pk=self.reply.pk).exists())
+        self.assertTrue(Topic.objects.filter(pk=self.topic.pk).exists())
+
+    def test_deleting_first_post_deletes_topic(self):
+        first = self.topic.posts.first()
+        self.client.post(reverse("forum:post_delete", args=[first.pk]))
+        self.assertFalse(Topic.objects.filter(pk=self.topic.pk).exists())
+
+    def test_other_user_cannot_delete(self):
+        self.client.force_login(self.bob)
+        response = self.client.post(reverse("forum:post_delete", args=[self.reply.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Post.objects.filter(pk=self.reply.pk).exists())
+
+    def test_staff_can_delete(self):
+        self.bob.is_staff = True
+        self.bob.save()
+        self.client.force_login(self.bob)
+        self.client.post(reverse("forum:post_delete", args=[self.reply.pk]))
+        self.assertFalse(Post.objects.filter(pk=self.reply.pk).exists())
