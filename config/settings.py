@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.contrib.messages import constants as message_constants
 from django.utils.csp import CSP
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -179,6 +180,9 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+# Bootstrap has no "alert-error" class, error messages need "alert-danger"
+MESSAGE_TAGS = {message_constants.ERROR: 'danger'}
 
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'accounts:dashboard'

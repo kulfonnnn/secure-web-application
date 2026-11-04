@@ -160,6 +160,8 @@ class PostOwnershipTests(ForumTestCase):
             reverse("forum:post_edit", args=[self.reply.pk]), {"content": "Hacked by Bob!!!"}
         )
         self.assertEqual(response.status_code, 403)
+        # Styled error page instead of Django's bare "403 Forbidden"
+        self.assertContains(response, "Access denied", status_code=403)
         self.reply.refresh_from_db()
         self.assertEqual(self.reply.content, "Second post by Alice.")
 
@@ -196,6 +198,8 @@ class SpamProtectionTests(ForumTestCase):
             self.assertEqual(response.status_code, 302)
         response = self.client.post(url, {"content": "One reply too many."})
         self.assertEqual(response.status_code, 429)
+        # Error message uses Bootstrap's red alert (messages.ERROR -> "danger")
+        self.assertContains(response, "alert-danger", status_code=429)
         self.assertEqual(topic.posts.count(), 6)  # first post + 5 replies
 
     def test_too_large_request_rejected(self):
