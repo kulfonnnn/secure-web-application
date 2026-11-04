@@ -293,8 +293,8 @@ class AttachmentTests(ForumTestCase):
         response = self.client.get(reverse("forum:attachment_download", args=[post.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+        # Reading streaming_content also closes the file (test client handles it)
         self.assertEqual(b"".join(response.streaming_content), PNG_BYTES)
-        response.close()
 
     def test_file_removed_with_post(self):
         post = self.post_with_file(self.create_topic())
