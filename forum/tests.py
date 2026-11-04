@@ -179,3 +179,22 @@ class PostOwnershipTests(ForumTestCase):
         self.client.force_login(self.bob)
         self.client.post(reverse("forum:post_delete", args=[self.reply.pk]))
         self.assertFalse(Post.objects.filter(pk=self.reply.pk).exists())
+
+
+class SpamProtectionTests(ForumTestCase):
+    def test_sixth_post_in_a_minute_is_blocked(self):
+        topic = self.create_topic()
+        url = reverse("forum:topic_detail", args=[topic.pk])
+        for i in range(5):
+            response = self.client.post(url, {"content": f"Reply number {i} here."})
+            self.assertEqual(response.status_code, 302)
+        response = self.client.post(url, {"content": "One reply too many."})
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(topic.posts.count(), 6)  # first post + 5 replies
+
+    def test_too_large_request_rejected(self):
+        topic = self.create_topic()
+        response = self.client.post(
+            reverse("forum:topic_detail", args=[topic.pk]), {"content": "a" * 300_000}
+        )
+        self.assertEqual(response.status_code, 400)

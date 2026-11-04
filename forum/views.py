@@ -6,9 +6,15 @@ from django.db.models import Count, Max
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django_ratelimit.decorators import ratelimit
 
 from .forms import PostForm, TopicForm
 from .models import Forum, Post, Topic
+
+# One shared limit for new topics, replies and edits
+POST_RATE = '5/m'
+RATE_GROUP = 'forum-posting'
+RATE_LIMIT_MESSAGE = 'You are posting too fast. Please wait a moment and try again.'
 
 
 @login_required
@@ -29,11 +35,16 @@ def topic_list_view(request, forum_id):
 
 
 @login_required
+@ratelimit(group=RATE_GROUP, key='user', rate=POST_RATE, method='POST', block=False)
 def topic_create_view(request, forum_id):
     forum = get_object_or_404(Forum, pk=forum_id)
+    status = 200
     if request.method == 'POST':
         form = TopicForm(request.POST)
-        if form.is_valid():
+        if request.limited:
+            messages.error(request, RATE_LIMIT_MESSAGE)
+            status = 429
+        elif form.is_valid():
             # Topic and its first post are saved together
             with transaction.atomic():
                 topic = form.save(commit=False)
@@ -47,15 +58,20 @@ def topic_create_view(request, forum_id):
             return redirect('forum:topic_detail', topic_id=topic.pk)
     else:
         form = TopicForm()
-    return render(request, 'forum/topic_form.html', {'forum': forum, 'form': form})
+    return render(request, 'forum/topic_form.html', {'forum': forum, 'form': form}, status=status)
 
 
 @login_required
+@ratelimit(group=RATE_GROUP, key='user', rate=POST_RATE, method='POST', block=False)
 def topic_detail_view(request, topic_id):
     topic = get_object_or_404(Topic.objects.select_related('forum', 'author'), pk=topic_id)
+    status = 200
     if request.method == 'POST':
         form = PostForm(request.POST)
-        if form.is_valid():
+        if request.limited:
+            messages.error(request, RATE_LIMIT_MESSAGE)
+            status = 429
+        elif form.is_valid():
             post = form.save(commit=False)
             post.topic = topic
             post.author = request.user
@@ -65,18 +81,26 @@ def topic_detail_view(request, topic_id):
     else:
         form = PostForm()
     posts = topic.posts.select_related('author')
-    return render(request, 'forum/topic_detail.html', {'topic': topic, 'posts': posts, 'form': form})
+    return render(
+        request, 'forum/topic_detail.html',
+        {'topic': topic, 'posts': posts, 'form': form}, status=status,
+    )
 
 
 @login_required
+@ratelimit(group=RATE_GROUP, key='user', rate=POST_RATE, method='POST', block=False)
 def post_edit_view(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     # Only the author can edit (changing the id in URL is not enough)
     if post.author != request.user:
         raise PermissionDenied
+    status = 200
     if request.method == 'POST':
         form = PostForm(request.POST, instance=post)
-        if form.is_valid():
+        if request.limited:
+            messages.error(request, RATE_LIMIT_MESSAGE)
+            status = 429
+        elif form.is_valid():
             post = form.save(commit=False)
             post.edited_at = timezone.now()
             post.save()
@@ -84,7 +108,7 @@ def post_edit_view(request, post_id):
             return redirect('forum:topic_detail', topic_id=post.topic_id)
     else:
         form = PostForm(instance=post)
-    return render(request, 'forum/post_form.html', {'post': post, 'form': form})
+    return render(request, 'forum/post_form.html', {'post': post, 'form': form}, status=status)
 
 
 @login_required
