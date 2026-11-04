@@ -21,7 +21,11 @@ class PostContentField(forms.CharField):
     def __init__(self, **kwargs):
         kwargs.setdefault("label", "Content")
         kwargs.setdefault("max_length", CONTENT_MAX_LENGTH)
-        kwargs.setdefault("widget", forms.Textarea(attrs={"class": "form-control", "rows": 8}))
+        kwargs.setdefault(
+            "widget",
+            # data-editor: replaced by Quill in the browser (forum/js/editor.js)
+            forms.Textarea(attrs={"class": "form-control", "rows": 8, "data-editor": "quill"}),
+        )
         super().__init__(**kwargs)
 
     def clean(self, value):

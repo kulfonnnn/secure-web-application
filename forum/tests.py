@@ -315,3 +315,20 @@ class AttachmentTests(ForumTestCase):
         post.refresh_from_db()
         self.assertFalse(os.path.exists(old_path))
         self.assertTrue(os.path.exists(post.attachment.path))
+
+
+class EditorTests(ForumTestCase):
+    def test_editor_assets_on_forms(self):
+        topic = self.create_topic()
+        for url in [
+            reverse("forum:topic_create", args=[self.forum.pk]),
+            reverse("forum:topic_detail", args=[topic.pk]),
+            reverse("forum:post_edit", args=[topic.posts.get().pk]),
+        ]:
+            response = self.client.get(url)
+            self.assertContains(response, 'data-editor="quill"')
+            self.assertContains(response, "forum/js/editor.js")
+
+    def test_editor_not_loaded_elsewhere(self):
+        response = self.client.get(reverse("forum:forum_list"))
+        self.assertNotContains(response, "quill")
