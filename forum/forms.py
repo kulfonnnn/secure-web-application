@@ -2,6 +2,18 @@ from django import forms
 
 from .models import CONTENT_MAX_LENGTH, CONTENT_MIN_LENGTH, Post, Topic
 from .sanitizers import sanitize_html, visible_text
+from .validators import validate_attachment
+
+
+def attachment_field():
+    return forms.FileField(
+        label="Attachment (PNG, JPG, GIF, PDF, max 2 MB)",
+        required=False,
+        validators=[validate_attachment],
+        widget=forms.FileInput(
+            attrs={"class": "form-control", "accept": ".png,.jpg,.jpeg,.gif,.pdf"}
+        ),
+    )
 
 
 class PostContentField(forms.CharField):
@@ -24,10 +36,12 @@ class PostContentField(forms.CharField):
 
 class TopicForm(forms.ModelForm):
     content = PostContentField()
+    # Saved on the first post of the topic (see topic_create_view)
+    attachment = attachment_field()
 
     class Meta:
         model = Topic
-        fields = ("title", "content")
+        fields = ("title", "content", "attachment")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -36,7 +50,8 @@ class TopicForm(forms.ModelForm):
 
 class PostForm(forms.ModelForm):
     content = PostContentField()
+    attachment = attachment_field()
 
     class Meta:
         model = Post
-        fields = ("content",)
+        fields = ("content", "attachment")

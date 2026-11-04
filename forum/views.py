@@ -3,13 +3,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Max
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
 from .forms import PostForm, TopicForm
-from .models import Forum, Post, Topic
+from .models import Forum, Post, Topic, delete_file_on_commit
 
 # One shared limit for new topics, replies and edits
 POST_RATE = '5/m'
@@ -40,7 +41,7 @@ def topic_create_view(request, forum_id):
     forum = get_object_or_404(Forum, pk=forum_id)
     status = 200
     if request.method == 'POST':
-        form = TopicForm(request.POST)
+        form = TopicForm(request.POST, request.FILES)
         if request.limited:
             messages.error(request, RATE_LIMIT_MESSAGE)
             status = 429
@@ -52,7 +53,10 @@ def topic_create_view(request, forum_id):
                 topic.author = request.user
                 topic.save()
                 Post.objects.create(
-                    topic=topic, author=request.user, content=form.cleaned_data['content']
+                    topic=topic,
+                    author=request.user,
+                    content=form.cleaned_data['content'],
+                    attachment=form.cleaned_data['attachment'],
                 )
             messages.success(request, 'Topic created.')
             return redirect('forum:topic_detail', topic_id=topic.pk)
@@ -67,7 +71,7 @@ def topic_detail_view(request, topic_id):
     topic = get_object_or_404(Topic.objects.select_related('forum', 'author'), pk=topic_id)
     status = 200
     if request.method == 'POST':
-        form = PostForm(request.POST)
+        form = PostForm(request.POST, request.FILES)
         if request.limited:
             messages.error(request, RATE_LIMIT_MESSAGE)
             status = 429
@@ -94,9 +98,10 @@ def post_edit_view(request, post_id):
     # Only the author can edit (changing the id in URL is not enough)
     if post.author != request.user:
         raise PermissionDenied
+    current_attachment = post.attachment.name
     status = 200
     if request.method == 'POST':
-        form = PostForm(request.POST, instance=post)
+        form = PostForm(request.POST, request.FILES, instance=post)
         if request.limited:
             messages.error(request, RATE_LIMIT_MESSAGE)
             status = 429
@@ -104,11 +109,17 @@ def post_edit_view(request, post_id):
             post = form.save(commit=False)
             post.edited_at = timezone.now()
             post.save()
+            # New file uploaded: remove the replaced one from disk
+            if current_attachment and current_attachment != post.attachment.name:
+                delete_file_on_commit(post.attachment.storage, current_attachment)
             messages.success(request, 'Post updated.')
             return redirect('forum:topic_detail', topic_id=post.topic_id)
     else:
         form = PostForm(instance=post)
-    return render(request, 'forum/post_form.html', {'post': post, 'form': form}, status=status)
+    return render(
+        request, 'forum/post_form.html',
+        {'post': post, 'form': form, 'has_attachment': bool(current_attachment)}, status=status,
+    )
 
 
 @login_required
@@ -132,3 +143,12 @@ def post_delete_view(request, post_id):
         messages.success(request, 'Post deleted.')
         return redirect('forum:topic_detail', topic_id=topic.pk)
     return render(request, 'forum/post_confirm_delete.html', {'post': post, 'is_first_post': is_first_post})
+
+
+@login_required
+def attachment_download_view(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    if not post.attachment:
+        raise Http404
+    # Always download, never render in the browser
+    return FileResponse(post.attachment.open('rb'), as_attachment=True)

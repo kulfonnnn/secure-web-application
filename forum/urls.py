@@ -10,4 +10,5 @@ urlpatterns = [
     path('topic/<int:topic_id>/', views.topic_detail_view, name='topic_detail'),
     path('post/<int:post_id>/edit/', views.post_edit_view, name='post_edit'),
     path('post/<int:post_id>/delete/', views.post_delete_view, name='post_delete'),
+    path('post/<int:post_id>/attachment/', views.attachment_download_view, name='attachment_download'),
 ]

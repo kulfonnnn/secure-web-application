@@ -26,6 +26,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 # wlascicielem plikow bedzie stworzony user app
 COPY --chown=app:app . /app/
 
+# katalog na zalaczniki z uprawnieniami dla usera app
+RUN mkdir -p /app/media && chown app:app /app/media
+
 # nastepne instrukcje z poziomu usera (ograniczenie uprawnien)
 USER app
 

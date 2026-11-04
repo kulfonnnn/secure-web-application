@@ -47,6 +47,8 @@ services:
 # adres_hosta:port_hosta:port_konenera
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - media_data:/app/media # zalaczniki postow (trwale miedzy restartami)
     depends_on: # kolejnosc uruchamiania
       db:
         condition: service_healthy # czekanie, az baza danych bedzie dzialac
@@ -58,3 +60,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:

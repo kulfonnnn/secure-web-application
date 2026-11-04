@@ -1,6 +1,11 @@
+import os
+import shutil
+import tempfile
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .forms import PostForm, TopicForm
@@ -10,6 +15,7 @@ from .sanitizers import sanitize_html
 User = get_user_model()
 
 VALID_CONTENT = "This is a valid post content."
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
 
 class ForumTestCase(TestCase):
@@ -232,3 +238,80 @@ class AdminModerationTests(ForumTestCase):
         self.assertEqual(response.status_code, 302)
         self.post.refresh_from_db()
         self.assertEqual(self.post.content, "<p>Moderated text here</p>")
+
+
+class AttachmentTests(ForumTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Uploaded files go to a temporary folder, not to the project
+        cls.media_root = tempfile.mkdtemp()
+        cls.enterClassContext(override_settings(MEDIA_ROOT=cls.media_root))
+        cls.addClassCleanup(shutil.rmtree, cls.media_root, ignore_errors=True)
+
+    def form_with_file(self, name, data):
+        return PostForm(
+            data={"content": VALID_CONTENT},
+            files={"attachment": SimpleUploadedFile(name, data)},
+        )
+
+    def post_with_file(self, topic):
+        return Post.objects.create(
+            topic=topic, author=self.alice, content=VALID_CONTENT,
+            attachment=SimpleUploadedFile("photo.png", PNG_BYTES),
+        )
+
+    def test_valid_png_accepted(self):
+        form = self.form_with_file("image.png", PNG_BYTES)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_disallowed_extension_rejected(self):
+        self.assertIn("attachment", self.form_with_file("script.exe", b"MZ" + b"\x00" * 100).errors)
+
+    def test_fake_extension_rejected(self):
+        # Windows executable renamed to .png
+        self.assertIn("attachment", self.form_with_file("evil.png", b"MZ\x90\x00" + b"\x00" * 100).errors)
+
+    def test_too_large_rejected(self):
+        big = PNG_BYTES + b"\x00" * (2 * 1024 * 1024)
+        self.assertIn("attachment", self.form_with_file("big.png", big).errors)
+
+    def test_download_requires_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("forum:attachment_download", args=[1]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_upload_and_download(self):
+        topic = self.create_topic()
+        self.client.post(
+            reverse("forum:topic_detail", args=[topic.pk]),
+            {"content": VALID_CONTENT, "attachment": SimpleUploadedFile("photo.png", PNG_BYTES)},
+        )
+        post = topic.posts.last()
+        # Stored under a random name, not the uploaded one
+        self.assertRegex(post.attachment.name, r"^attachments/[0-9a-f]{32}\.png$")
+        response = self.client.get(reverse("forum:attachment_download", args=[post.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Disposition"].startswith("attachment;"))
+        self.assertEqual(b"".join(response.streaming_content), PNG_BYTES)
+        response.close()
+
+    def test_file_removed_with_post(self):
+        post = self.post_with_file(self.create_topic())
+        path = post.attachment.path
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(reverse("forum:post_delete", args=[post.pk]))
+        self.assertFalse(os.path.exists(path))
+
+    def test_replaced_file_removed(self):
+        post = self.post_with_file(self.create_topic())
+        old_path = post.attachment.path
+        new_file = SimpleUploadedFile("new.png", PNG_BYTES)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("forum:post_edit", args=[post.pk]),
+                {"content": VALID_CONTENT, "attachment": new_file},
+            )
+        post.refresh_from_db()
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(post.attachment.path))
