@@ -35,8 +35,9 @@ class ForumTestCase(TestCase):
 
 
 class ModelTests(ForumTestCase):
-    def test_seed_forums_exist(self):
-        self.assertTrue(Forum.objects.filter(name="Web security").exists())
+    def test_one_general_forum_seeded(self):
+        seeded = Forum.objects.exclude(pk=self.forum.pk)
+        self.assertEqual(list(seeded.values_list("name", flat=True)), ["General"])
 
     def test_post_stores_author_and_date(self):
         post = self.create_topic().posts.get()
@@ -94,6 +95,20 @@ class AccessTests(ForumTestCase):
         url = reverse("forum:forum_list")
         response = self.client.get(url)
         self.assertRedirects(response, f"{reverse('accounts:login')}?next={url}")
+
+
+class ForumListTests(ForumTestCase):
+    def test_single_forum_opens_topic_list(self):
+        Forum.objects.exclude(pk=self.forum.pk).delete()
+        response = self.client.get(reverse("forum:forum_list"), follow=True)
+        self.assertRedirects(response, reverse("forum:topic_list", args=[self.forum.pk]))
+        self.assertContains(response, "New topic")
+        self.assertNotContains(response, "All forums")
+
+    def test_many_forums_listed(self):
+        response = self.client.get(reverse("forum:forum_list"))
+        self.assertContains(response, "General")
+        self.assertContains(response, "Test forum")
 
 
 class TopicViewTests(ForumTestCase):

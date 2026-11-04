@@ -1,9 +1,9 @@
 from django.db import migrations
 
+# One general forum: users open their own topics and reply in others'.
+# More forums can be added in the admin panel.
 FORUMS = [
     ("General", "General discussion"),
-    ("Web security", "XSS, CSRF, authentication and other web security topics"),
-    ("Off-topic", "Everything else"),
 ]
 
 

@@ -20,7 +20,10 @@ RATE_LIMIT_MESSAGE = 'You are posting too fast. Please wait a moment and try aga
 
 @login_required
 def forum_list_view(request):
-    forums = Forum.objects.annotate(topic_count=Count('topics'))
+    forums = list(Forum.objects.annotate(topic_count=Count('topics')))
+    # Default setup has a single forum: go straight to its topics
+    if len(forums) == 1:
+        return redirect('forum:topic_list', forum_id=forums[0].pk)
     return render(request, 'forum/forum_list.html', {'forums': forums})
 
 
@@ -32,7 +35,11 @@ def topic_list_view(request, forum_id):
         .annotate(post_count=Count('posts'), last_post_at=Max('posts__created_at'))
         .order_by('-last_post_at')
     )
-    return render(request, 'forum/topic_list.html', {'forum': forum, 'topics': topics})
+    has_other_forums = Forum.objects.exclude(pk=forum.pk).exists()
+    return render(
+        request, 'forum/topic_list.html',
+        {'forum': forum, 'topics': topics, 'has_other_forums': has_other_forums},
+    )
 
 
 @login_required
