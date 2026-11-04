@@ -19,6 +19,17 @@ services:
       retries: 10
       start_period: 10s
 
+# kontener - cache (Redis) potrzebny do rate limitingu
+  redis:
+    image: redis:8-alpine # gotowy obraz Redisa
+    restart: unless-stopped
+# sprawdza, czy Redis odpowiada
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 # kontener - aplikacja django
   web:
     build: . # uzywa dockerfile z biezacego katalogu
@@ -32,12 +43,15 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_HOST: db
       DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0 # adres cache (liczniki rate limitingu)
 # adres_hosta:port_hosta:port_konenera
     ports:
       - "127.0.0.1:8000:8000"
     depends_on: # kolejnosc uruchamiania
       db:
         condition: service_healthy # czekanie, az baza danych bedzie dzialac
+      redis:
+        condition: service_healthy # czekanie, az Redis bedzie dzialac
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py runserver 0.0.0.0:8000"
