@@ -198,3 +198,9 @@ class SpamProtectionTests(ForumTestCase):
             reverse("forum:topic_detail", args=[topic.pk]), {"content": "a" * 300_000}
         )
         self.assertEqual(response.status_code, 400)
+
+
+class SecurityHeaderTests(ForumTestCase):
+    def test_csp_header_present(self):
+        response = self.client.get(reverse("forum:forum_list"))
+        self.assertIn("default-src 'self'", response.headers["Content-Security-Policy"])
