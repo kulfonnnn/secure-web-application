@@ -204,3 +204,31 @@ class SecurityHeaderTests(ForumTestCase):
     def test_csp_header_present(self):
         response = self.client.get(reverse("forum:forum_list"))
         self.assertIn("default-src 'self'", response.headers["Content-Security-Policy"])
+
+
+class AdminModerationTests(ForumTestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_superuser("admin", "admin@example.com", "S3cure-pass-123")
+        self.client.force_login(self.admin)
+        self.topic = self.create_topic()
+        self.post = self.topic.posts.get()
+
+    def test_admin_lists_posts_and_users(self):
+        response = self.client.get(reverse("admin:forum_post_changelist"))
+        self.assertContains(response, VALID_CONTENT)
+        response = self.client.get(reverse("admin:accounts_customuser_changelist"))
+        self.assertContains(response, "alice")
+
+    def test_admin_edit_is_sanitized(self):
+        response = self.client.post(
+            reverse("admin:forum_post_change", args=[self.post.pk]),
+            {
+                "topic": self.topic.pk,
+                "author": self.alice.pk,
+                "content": "<p>Moderated text here</p><script>alert(1)</script>",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.content, "<p>Moderated text here</p>")
