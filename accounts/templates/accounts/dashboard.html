@@ -14,6 +14,7 @@
                     <tr><th>Joined</th>
                         <td>{{ user.date_joined|date:"M d, Y H:i" }}</td></tr>
                 </table>
+                <a class="btn btn-primary" href="{% url 'forum:forum_list' %}">Go to forum</a>
                 <p class="text-muted">
                     This page is only accessible to logged-in users.
                 </p>

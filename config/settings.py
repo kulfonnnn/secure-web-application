@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.contrib.messages import constants as message_constants
+from django.utils.csp import CSP
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -45,6 +48,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'accounts',
+    'forum',
+    'django_ratelimit',
 ]
 
 AUTH_USER_MODEL = "accounts.CustomUser"
@@ -59,6 +64,7 @@ PASSWORD_HASHERS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -66,6 +72,18 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Second layer against XSS: browser runs only scripts from allowed sources
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, "https://cdn.jsdelivr.net"],
+    "style-src": [CSP.SELF, "https://cdn.jsdelivr.net"],
+    "img-src": [CSP.SELF, "data:"],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.NONE],
+    "frame-ancestors": [CSP.NONE],
+    "form-action": [CSP.SELF],
+}
 
 ROOT_URLCONF = 'config.urls'
 
@@ -101,6 +119,19 @@ DATABASES = {
     }
 }
 
+# Shared cache for rate limiting (django-ratelimit needs atomic increments)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+    }
+}
+# Built-in RedisCache uses atomic INCR, it's just not on django-ratelimit's list
+SILENCED_SYSTEM_CHECKS = ["django_ratelimit.W001"]
+
+# Max size of request body without files (protects against huge posts)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024
+
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
@@ -125,7 +156,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Warsaw'
 
 USE_I18N = True
 
@@ -137,6 +168,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Uploaded attachments: not served publicly, only through a login-protected view
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
@@ -146,6 +180,9 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+# Bootstrap has no "alert-error" class, error messages need "alert-danger"
+MESSAGE_TAGS = {message_constants.ERROR: 'danger'}
 
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'accounts:dashboard'

@@ -1,0 +1,33 @@
+{% extends "accounts/base.html" %}
+{% block title %}{{ forum.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="mb-0">{{ forum.name }}</h3>
+                    <a class="btn btn-success" href="{% url 'forum:topic_create' forum.pk %}">New topic</a>
+                </div>
+                {% if has_other_forums %}
+                    <a href="{% url 'forum:forum_list' %}">&larr; All forums</a>
+                {% endif %}
+                <table class="table mt-3">
+                    <tr><th>Topic</th><th>Author</th><th>Posts</th><th>Last post</th></tr>
+                    {% for topic in topics %}
+                        <tr>
+                            <td><a href="{% url 'forum:topic_detail' topic.pk %}">{{ topic.title }}</a></td>
+                            <td>{{ topic.author.username }}</td>
+                            <td>{{ topic.post_count }}</td>
+                            <td>{{ topic.last_post_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted">No topics yet.</td></tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

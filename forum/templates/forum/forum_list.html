@@ -1,0 +1,28 @@
+{% extends "accounts/base.html" %}
+{% block title %}Forum{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h3 class="mb-4">Forum</h3>
+                <div class="list-group">
+                    {% for forum in forums %}
+                        <a class="list-group-item list-group-item-action"
+                           href="{% url 'forum:topic_list' forum.pk %}">
+                            <div class="d-flex justify-content-between">
+                                <strong>{{ forum.name }}</strong>
+                                <span class="badge bg-secondary">{{ forum.topic_count }} topics</span>
+                            </div>
+                            <small class="text-muted">{{ forum.description }}</small>
+                        </a>
+                    {% empty %}
+                        <p class="text-muted">No forums yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
