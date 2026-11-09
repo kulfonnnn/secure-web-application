@@ -95,3 +95,5 @@ docker compose exec web python manage.py migrate
 ## Uwagi
 
 Projekt jest rozwijany. Obecna konfiguracja Dockera służy do lokalnego środowiska deweloperskiego. Docelowo aplikacja zostanie rozbudowana o wymagane funkcjonalności oraz wdrożona w środowisku chmurowym AWS.
+<img width="1595" height="891" alt="awsinfrastructure drawio" src="https://github.com/user-attachments/assets/7b64798e-ef2c-4c8b-b8b6-d9b1f528a66b" />
+
