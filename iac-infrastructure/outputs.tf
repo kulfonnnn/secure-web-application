@@ -21,3 +21,11 @@ output "ec2_instance_profile" {
 output "security_group_ids" {
   value = module.security_groups.ids
 }
+
+output "bucket_names" {
+  value = {
+    attachments = module.attachments.bucket_name
+    deploy      = module.deploy.bucket_name
+    alb_logs    = module.alb_logs.bucket_name
+  }
+}
