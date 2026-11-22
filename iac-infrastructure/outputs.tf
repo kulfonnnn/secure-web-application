@@ -29,3 +29,7 @@ output "bucket_names" {
     alb_logs    = module.alb_logs.bucket_name
   }
 }
+
+output "db_endpoint" {
+  value = module.rds.endpoint
+}
