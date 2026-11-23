@@ -10,3 +10,10 @@ nh3==0.3.7
 django-ratelimit==4.1.0
 redis==8.1.0
 filetype==1.2.0
+gunicorn==27.0.1
+whitenoise==6.12.0
+boto3==1.44.9
+botocore==1.44.9
+s3transfer==0.19.3
+jmespath==1.1.0
+django-storages==1.14.6

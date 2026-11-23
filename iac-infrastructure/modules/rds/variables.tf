@@ -25,3 +25,8 @@ variable "password" {
   type      = string
   sensitive = true
 }
+
+
+variable "availability_zone" {
+  type = string
+}

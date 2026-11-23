@@ -5,3 +5,11 @@ output "endpoint" {
 output "instance_id" {
   value = aws_db_instance.this.identifier
 }
+
+output "db_name" {
+  value = aws_db_instance.this.db_name
+}
+
+output "username" {
+  value = aws_db_instance.this.username
+}

@@ -1,0 +1,33 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pakiet certyfikatów CA Amazon RDS (instancje nie mają dostępu do Internetu)
+ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /certs/rds-global-bundle.pem
+RUN chmod 644 /certs/rds-global-bundle.pem
+
+COPY . .
+
+# Pliki statyczne zbieramy podczas budowania (tymczasowe wartości tylko na czas collectstatic)
+RUN env DJANGO_SETTINGS_MODULE=config.settings_production \
+        DJANGO_SECRET_KEY=build-only DJANGO_ALLOWED_HOSTS=localhost APP_FQDN=localhost \
+        DB_HOST=localhost DB_NAME=x DB_USER=x DB_PASSWORD=x \
+        REDIS_URL=redis://localhost:6379/0 \
+        AWS_STORAGE_BUCKET_NAME=x AWS_S3_REGION_NAME=eu-central-1 \
+    python manage.py collectstatic --noinput
+
+# Proces bez uprawnień roota
+RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /var/log/bsiaw \
+    && chown app:app /var/log/bsiaw
+USER app
+
+EXPOSE 8000
+ENTRYPOINT ["python", "/app/deploy/entrypoint.py"]
+CMD ["gunicorn", "config.wsgi_production:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-"]

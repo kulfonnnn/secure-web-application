@@ -33,3 +33,15 @@ output "bucket_names" {
 output "db_endpoint" {
   value = module.rds.endpoint
 }
+
+output "cache_endpoint" {
+  value = module.cache.endpoint
+}
+
+output "instance_ids" {
+  value = module.ec2.instance_ids
+}
+
+output "dns_validation_records" {
+  value = [for r in aws_route53_record.cert_validation : r.fqdn]
+}

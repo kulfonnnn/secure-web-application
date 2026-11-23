@@ -1,0 +1,72 @@
+#!/bin/bash
+# Szablon user_data (cloud-init): Docker, AWS CLI i usługa uruchamiająca aplikację
+set -euxo pipefail
+exec > >(tee -a /var/log/bsiaw-bootstrap.log) 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+for i in $(seq 1 30); do apt-get update -y && break || sleep 10; done
+apt-get install -y docker.io unzip curl
+
+curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
+
+systemctl enable --now docker
+
+install -d -m 0755 /etc/bsiaw
+cat > /etc/bsiaw/instance.env <<'EOF'
+AWS_REGION=${region}
+DEPLOY_BUCKET=${deploy_bucket}
+EOF
+
+# Katalog logów aplikacji (kontener działa jako uid 10001)
+install -d -o 10001 -g 10001 -m 0750 /var/log/bsiaw
+
+# Uruchomienie aplikacji: obraz i wersja z S3
+cat > /usr/local/bin/bsiaw-start <<'EOF'
+#!/bin/bash
+set -euo pipefail
+set -a; source /etc/bsiaw/instance.env; set +a
+export AWS_DEFAULT_REGION="$AWS_REGION"
+VERSION=$(aws s3 cp "s3://$DEPLOY_BUCKET/config/release.txt" - | tr -d '[:space:]')
+aws s3 cp "s3://$DEPLOY_BUCKET/images/bsiaw-web-$VERSION.tar" /tmp/bsiaw-web.tar
+docker load -i /tmp/bsiaw-web.tar
+rm -f /tmp/bsiaw-web.tar
+docker rm -f web >/dev/null 2>&1 || true
+exec docker run --name web -p 8000:8000 \
+  -e AWS_REGION -e APP_CONFIG_URI="s3://$DEPLOY_BUCKET/config/app.env" \
+  -v /var/log/bsiaw:/var/log/bsiaw "bsiaw-web:$VERSION"
+EOF
+
+# Jednorazowe polecenia w kontekście aplikacji (migracje, createsuperuser)
+cat > /usr/local/bin/bsiaw-run <<'EOF'
+#!/bin/bash
+set -euo pipefail
+set -a; source /etc/bsiaw/instance.env; set +a
+export AWS_DEFAULT_REGION="$AWS_REGION"
+VERSION=$(aws s3 cp "s3://$DEPLOY_BUCKET/config/release.txt" - | tr -d '[:space:]')
+exec docker run --rm -it -e AWS_REGION -e APP_CONFIG_URI="s3://$DEPLOY_BUCKET/config/app.env" \
+  -v /var/log/bsiaw:/var/log/bsiaw "bsiaw-web:$VERSION" "$@"
+EOF
+chmod +x /usr/local/bin/bsiaw-start /usr/local/bin/bsiaw-run
+
+cat > /etc/systemd/system/bsiaw-app.service <<'EOF'
+[Unit]
+Description=bsiaw application container
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bsiaw-start
+Restart=always
+RestartSec=15
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now bsiaw-app.service

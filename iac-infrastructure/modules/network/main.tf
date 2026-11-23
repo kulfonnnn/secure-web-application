@@ -61,3 +61,24 @@ resource "aws_default_security_group" "this" {
   vpc_id = aws_vpc.this.id
   tags   = { Name = "${var.project}-default-sg-unused" }
 }
+
+resource "aws_eip" "nat" {
+  count  = var.enable_nat ? 1 : 0
+  domain = "vpc"
+  tags   = { Name = "${var.project}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "this" {
+  count         = var.enable_nat ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.this["public-a"].id
+  tags          = { Name = "${var.project}-nat" }
+  depends_on    = [aws_internet_gateway.this]
+}
+
+resource "aws_route" "app_internet" {
+  count                  = var.enable_nat ? 1 : 0
+  route_table_id         = aws_route_table.this["app"].id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.this[0].id
+}

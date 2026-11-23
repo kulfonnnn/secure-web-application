@@ -14,3 +14,9 @@ variable "subnets" {
     tier = string
   }))
 }
+
+variable "enable_nat" {
+  description = "Tymczasowy NAT Gateway (aktualizacje instancji)"
+  type        = bool
+  default     = false
+}

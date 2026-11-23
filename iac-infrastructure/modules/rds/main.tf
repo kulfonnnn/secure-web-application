@@ -25,10 +25,11 @@ resource "aws_db_instance" "this" {
   storage_type      = "gp3"
   storage_encrypted = true
 
-  db_name  = var.db_name
-  username = var.username
-  password = var.password
-  port     = 5432
+  availability_zone = var.availability_zone
+  db_name           = var.db_name
+  username          = var.username
+  password          = var.password
+  port              = 5432
 
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [var.security_group_id]
@@ -46,3 +47,4 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot        = true
   deletion_protection        = false
 }
+

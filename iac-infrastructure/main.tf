@@ -5,9 +5,10 @@ data "aws_region" "global" {
 }
 
 module "network" {
-  source   = "./modules/network"
-  project  = var.project
-  vpc_cidr = var.vpc_cidr
+  source     = "./modules/network"
+  project    = var.project
+  vpc_cidr   = var.vpc_cidr
+  enable_nat = var.enable_nat
 
   subnets = {
     public-a = { cidr = "10.0.1.0/24", az = "a", tier = "public" }
