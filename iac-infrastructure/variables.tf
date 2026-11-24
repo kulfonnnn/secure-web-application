@@ -48,3 +48,8 @@ variable "rate_limit" {
   type        = number
   default     = 30
 }
+
+variable "alert_email" {
+  description = "Adres e-mail dla powiadomień o alarmach"
+  type        = string
+}
