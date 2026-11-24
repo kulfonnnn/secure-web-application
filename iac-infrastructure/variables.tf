@@ -30,3 +30,21 @@ variable "enable_nat" {
   type        = bool
   default     = false
 }
+
+variable "waf_block" {
+  description = "false = reguły WAF w trybie Count, true = Block"
+  type        = bool
+  default     = false
+}
+
+variable "rate_limited_paths" {
+  description = "Ścieżki objęte limitem żądań (co najmniej 2)"
+  type        = list(string)
+  default     = ["/login/", "/register/", "/password-reset/", "/admin/login/"]
+}
+
+variable "rate_limit" {
+  description = "Maksymalna liczba żądań z jednego IP w 5 minut na ścieżki z listy"
+  type        = number
+  default     = 30
+}
