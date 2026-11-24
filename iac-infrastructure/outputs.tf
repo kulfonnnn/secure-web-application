@@ -45,3 +45,6 @@ output "instance_ids" {
 output "dns_validation_records" {
   value = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
+output "alb_dns_name" {
+  value = module.alb.dns_name
+}
