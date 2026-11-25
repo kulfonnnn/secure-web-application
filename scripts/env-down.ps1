@@ -29,3 +29,4 @@ Write-Host "Kontrola: oczekiwane puste wyniki (WAF, endpoint)"
 aws wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1 --query "WebACLs[].Name" --output text
 aws ec2 describe-vpc-endpoints --filters "Name=tag:Name,Values=bsiaw-secretsmanager-endpoint" --query "VpcEndpoints[?State!='deleted'].VpcEndpointId" --output text
 Write-Host "Srodowisko wylaczone."
+Read-Host "Nacisnij Enter, aby zamknac"
