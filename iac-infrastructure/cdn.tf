@@ -16,7 +16,7 @@ resource "aws_cloudfront_distribution" "this" {
   aliases      = [local.app_fqdn]
   price_class  = "PriceClass_100"
   http_version = "http2and3"
-  web_acl_id   = aws_wafv2_web_acl.this.arn
+  web_acl_id   = var.enable_waf ? aws_wafv2_web_acl.this[0].arn : null
 
   origin {
     origin_id   = "alb"
@@ -82,13 +82,19 @@ resource "aws_route53_record" "app" {
 }
 
 resource "aws_route53_record" "origin" {
+  count   = var.enable_alb ? 1 : 0
   zone_id = data.aws_route53_zone.this.zone_id
   name    = local.origin_fqdn
   type    = "A"
 
   alias {
-    name                   = module.alb.dns_name
-    zone_id                = module.alb.zone_id
+    name                   = module.alb[0].dns_name
+    zone_id                = module.alb[0].zone_id
     evaluate_target_health = true
   }
+}
+
+moved {
+  from = aws_route53_record.origin
+  to   = aws_route53_record.origin[0]
 }

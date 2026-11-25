@@ -10,7 +10,7 @@ resource "aws_s3_object" "app_config" {
     DB_PORT=5432
     DB_NAME=${module.rds.db_name}
     DB_USER=${module.rds.username}
-    REDIS_HOST=${module.cache.endpoint}
+    REDIS_HOST=${try(module.cache[0].endpoint, "")}
     AWS_STORAGE_BUCKET_NAME=${local.names.attachments_bucket}
     AWS_S3_REGION_NAME=${var.region}
     APP_SECRET_ID=${local.names.app_secret}

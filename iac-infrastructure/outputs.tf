@@ -35,7 +35,7 @@ output "db_endpoint" {
 }
 
 output "cache_endpoint" {
-  value = module.cache.endpoint
+  value = try(module.cache[0].endpoint, null)
 }
 
 output "instance_ids" {
@@ -46,7 +46,7 @@ output "dns_validation_records" {
   value = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
 output "alb_dns_name" {
-  value = module.alb.dns_name
+  value = try(module.alb[0].dns_name, null)
 }
 
 output "app_url" {

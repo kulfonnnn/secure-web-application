@@ -6,4 +6,5 @@ module "secrets" {
   vpc_id                     = module.network.vpc_id
   endpoint_subnet_id         = module.network.subnet_ids["app-a"]
   endpoint_security_group_id = module.security_groups.ids["secrets"]
+  enable_endpoint            = var.enable_secrets_endpoint
 }

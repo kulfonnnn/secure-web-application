@@ -21,3 +21,8 @@ variable "endpoint_subnet_id" {
 variable "endpoint_security_group_id" {
   type = string
 }
+
+variable "enable_endpoint" {
+  type    = bool
+  default = true
+}

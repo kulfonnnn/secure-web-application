@@ -44,6 +44,9 @@ resource "aws_sns_topic_subscription" "email" {
 
 # --- Definicje alarmów ---
 locals {
+  alb   = coalesce(var.alb_arn_suffix, "disabled")
+  tg    = coalesce(var.target_group_arn_suffix, "disabled")
+  cache = coalesce(var.cache_cluster_id, "disabled")
   ec2_alarms = merge([
     for k, id in var.instance_ids : {
       "ec2-${k}-cpu" = {
@@ -71,11 +74,11 @@ locals {
     }
   ]...)
 
-  alb_alarms = {
+  alb_alarms_all = {
     "alb-unhealthy" = {
       namespace          = "AWS/ApplicationELB"
       metric             = "UnHealthyHostCount"
-      dimensions         = { LoadBalancer = var.alb_arn_suffix, TargetGroup = var.target_group_arn_suffix }
+      dimensions         = { LoadBalancer = local.alb, TargetGroup = local.tg }
       statistic          = "Maximum"
       period             = 60
       evaluation_periods = 2
@@ -86,7 +89,7 @@ locals {
     "alb-app-5xx" = {
       namespace          = "AWS/ApplicationELB"
       metric             = "HTTPCode_Target_5XX_Count"
-      dimensions         = { LoadBalancer = var.alb_arn_suffix }
+      dimensions         = { LoadBalancer = local.alb }
       statistic          = "Sum"
       period             = 300
       evaluation_periods = 1
@@ -97,7 +100,7 @@ locals {
     "alb-elb-5xx" = {
       namespace          = "AWS/ApplicationELB"
       metric             = "HTTPCode_ELB_5XX_Count"
-      dimensions         = { LoadBalancer = var.alb_arn_suffix }
+      dimensions         = { LoadBalancer = local.alb }
       statistic          = "Sum"
       period             = 300
       evaluation_periods = 1
@@ -108,7 +111,7 @@ locals {
     "alb-latency" = {
       namespace          = "AWS/ApplicationELB"
       metric             = "TargetResponseTime"
-      dimensions         = { LoadBalancer = var.alb_arn_suffix }
+      dimensions         = { LoadBalancer = local.alb }
       statistic          = "Average"
       period             = 300
       evaluation_periods = 2
@@ -154,11 +157,11 @@ locals {
     }
   }
 
-  cache_alarms = {
+  cache_alarms_all = {
     "cache-cpu" = {
       namespace          = "AWS/ElastiCache"
       metric             = "EngineCPUUtilization"
-      dimensions         = { CacheClusterId = var.cache_cluster_id }
+      dimensions         = { CacheClusterId = local.cache }
       statistic          = "Average"
       period             = 300
       evaluation_periods = 2
@@ -169,7 +172,7 @@ locals {
     "cache-memory" = {
       namespace          = "AWS/ElastiCache"
       metric             = "DatabaseMemoryUsagePercentage"
-      dimensions         = { CacheClusterId = var.cache_cluster_id }
+      dimensions         = { CacheClusterId = local.cache }
       statistic          = "Average"
       period             = 300
       evaluation_periods = 1
@@ -178,8 +181,9 @@ locals {
       description        = "Pamięć Valkey zajęta w ponad 80%"
     }
   }
-
-  all_alarms = merge(local.ec2_alarms, local.alb_alarms, local.rds_alarms, local.cache_alarms)
+  alb_alarms   = { for k, v in local.alb_alarms_all : k => v if var.alb_arn_suffix != null }
+  cache_alarms = { for k, v in local.cache_alarms_all : k => v if var.cache_cluster_id != null }
+  all_alarms   = merge(local.ec2_alarms, local.alb_alarms_all, local.rds_alarms, local.cache_alarms_all)
 }
 
 resource "aws_cloudwatch_metric_alarm" "this" {
@@ -253,9 +257,9 @@ resource "aws_cloudwatch_dashboard" "this" {
         properties = {
           title = "ALB: liczba żądań i błędy", region = var.region, stat = "Sum", period = 300, view = "timeSeries"
           metrics = [
-            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.alb_arn_suffix, { label = "Żądania" }],
-            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { label = "5xx aplikacji" }],
-            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", var.alb_arn_suffix, { label = "5xx ALB" }],
+            ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", local.alb, { label = "Żądania" }],
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", local.alb, { label = "5xx aplikacji" }],
+            ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", local.alb, { label = "5xx ALB" }],
           ]
         }
       },
@@ -263,7 +267,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         type = "metric", x = 0, y = 6, width = 12, height = 6
         properties = {
           title   = "ALB: czas odpowiedzi [s]", region = var.region, stat = "Average", period = 300, view = "timeSeries"
-          metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix]]
+          metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", local.alb]]
         }
       },
       {
@@ -281,8 +285,8 @@ resource "aws_cloudwatch_dashboard" "this" {
         properties = {
           title = "ElastiCache: CPU [%] i pamięć [%]", region = var.region, stat = "Average", period = 300, view = "timeSeries"
           metrics = [
-            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", var.cache_cluster_id, { label = "CPU" }],
-            ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", var.cache_cluster_id, { label = "Pamięć" }],
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", local.cache, { label = "CPU" }],
+            ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", local.cache, { label = "Pamięć" }],
           ]
         }
       },

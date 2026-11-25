@@ -53,3 +53,27 @@ variable "alert_email" {
   description = "Adres e-mail dla powiadomień o alarmach"
   type        = string
 }
+
+variable "enable_alb" {
+  description = "false = ALB jest usunięty (oszczędność kosztów)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_cache" {
+  description = "false = ElastiCache jest usunięty (oszczędność kosztów)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_waf" {
+  description = "false = Web ACL jest odłączony od CloudFront i usunięty (oszczędność kosztów)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_secrets_endpoint" {
+  description = "false = endpoint Secrets Managera jest usunięty (oszczędność kosztów)"
+  type        = bool
+  default     = true
+}

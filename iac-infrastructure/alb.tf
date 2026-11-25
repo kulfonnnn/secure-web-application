@@ -4,6 +4,7 @@ resource "random_password" "origin_verify" {
 }
 
 module "alb" {
+  count                = var.enable_alb ? 1 : 0
   source               = "./modules/alb"
   project              = var.project
   vpc_id               = module.network.vpc_id
@@ -16,4 +17,9 @@ module "alb" {
 
   # Polityka bucketa logów musi istnieć przed utworzeniem ALB
   depends_on = [module.alb_logs]
+}
+
+moved {
+  from = module.alb
+  to   = module.alb[0]
 }
